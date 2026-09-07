@@ -27,3 +27,5 @@ pnpm-debug.log*
 
 # Artefactos temporales
 pedidos_app_export.zip
+.vercel
+.env*
