@@ -32,6 +32,21 @@
     --input: 120 10% 88%;
     --ring: 142 50% 42%;
 
+    /* Semantic status colors (color-as-information, never sole signal) */
+    --success: 152 62% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 46%;
+    --warning-foreground: 0 0% 100%;
+    --info: 211 88% 45%;
+    --info-foreground: 0 0% 100%;
+    --danger: 0 84% 55%;
+    --danger-foreground: 0 0% 100%;
+
+    --status-success-soft: 152 62% 94%;
+    --status-warning-soft: 45 100% 93%;
+    --status-danger-soft: 0 84% 95%;
+    --status-info-soft: 211 90% 95%;
+
     --radius: 0.625rem;
     --radius-sm: calc(0.625rem - 4px);
     --radius-lg: calc(0.625rem + 4px);
@@ -88,6 +103,20 @@
     --border: 150 5% 18%;
     --input: 150 5% 18%;
     --ring: 142 50% 45%;
+
+    --success: 152 62% 42%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 211 88% 52%;
+    --info-foreground: 0 0% 100%;
+    --danger: 0 84% 60%;
+    --danger-foreground: 0 0% 100%;
+
+    --status-success-soft: 152 45% 14%;
+    --status-warning-soft: 45 60% 14%;
+    --status-danger-soft: 0 60% 16%;
+    --status-info-soft: 211 60% 16%;
 
     --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.15);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.2);

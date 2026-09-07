@@ -14,17 +14,14 @@ import {
   Eye,
   Copy,
   Filter,
+  AlertTriangle,
 } from 'lucide-react';
 import { FadeIn, SlideIn } from '@/components/ui/animate';
 import { toast } from 'sonner';
 import { TIPO_PEDIDO_LABELS_SHORT } from '@/lib/constants';
+import { StatusBadge, ProgressBar } from '@/components/ui/status-viz';
+import { PEDIDO_ESTADO_META, estadoProgress } from '@/lib/status';
 
-const estadoLabel: Record<string, string> = { borrador: 'Borrador', enviado: 'Enviado', recibido: 'Recibido' };
-const estadoColor: Record<string, string> = {
-  borrador: 'bg-amber-100 text-amber-700',
-  enviado: 'bg-blue-100 text-blue-700',
-  recibido: 'bg-green-100 text-green-700',
-};
 const tipoLabel = TIPO_PEDIDO_LABELS_SHORT;
 
 export function PedidosListClient() {
@@ -85,7 +82,7 @@ export function PedidosListClient() {
             onClick={() => setFiltroEstado(est)}
             className="text-xs"
           >
-            {est === '' ? 'Todos' : estadoLabel[est] ?? est}
+            {est === '' ? 'Todos' : (PEDIDO_ESTADO_META[est as keyof typeof PEDIDO_ESTADO_META]?.label ?? est)}
           </Button>
         ))}
       </div>
@@ -110,30 +107,36 @@ export function PedidosListClient() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium">Pedido #{p?.id}</span>
-                        <Badge className={estadoColor[p?.estado] ?? 'bg-gray-100 text-gray-700'}>
-                          {estadoLabel[p?.estado] ?? p?.estado}
-                        </Badge>
+                        <StatusBadge tone={(PEDIDO_ESTADO_META[p?.estado as keyof typeof PEDIDO_ESTADO_META]?.tone ?? 'muted') as any} label={PEDIDO_ESTADO_META[p?.estado as keyof typeof PEDIDO_ESTADO_META]?.label ?? p?.estado} />
+                        {(() => {
+                          const ex = p?.extrasAlbaran;
+                          const n = ex ? ((ex?.extras?.length ?? 0) + (ex?.noRegistrados?.length ?? 0) + (ex?.noLlegaron?.length ?? 0)) : 0;
+                          return n > 0 ? <StatusBadge tone="warning" icon={AlertTriangle} size="sm" label={'Revisar (' + n + ')'} /> : null;
+                        })()}
                         {p?.tipoPedido && (
                           <Badge variant="outline" className="text-xs">
                             {tipoLabel[p?.tipoPedido] ?? p?.tipoPedido}
                           </Badge>
                         )}
                       </div>
-                      <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-4 mt-1.5 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{p?.fechaPedido ? new Date(p.fechaPedido).toLocaleDateString('es-ES') : ''}</span>
                         <span className="flex items-center gap-1"><User className="w-3 h-3" />{p?.user?.name ?? 'Usuario'}</span>
                         <span>{(p?.detalles ?? []).length} productos</span>
                       </div>
+                      <div className="mt-2 max-w-[220px]">
+                        <ProgressBar value={estadoProgress(p?.estado)} showLabel={false} tone={(PEDIDO_ESTADO_META[p?.estado as keyof typeof PEDIDO_ESTADO_META]?.tone ?? 'muted') as any} />
+                      </div>
                     </div>
                     <div className="flex items-center gap-1">
                       <Link href={`/pedidos/${p?.id}`}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8"><Eye className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Ver pedido"><Eye className="w-4 h-4" /></Button>
                       </Link>
                       <Link href={`/pedidos/nuevo?copiar=${p?.id}`}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8"><Copy className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Copiar pedido"><Copy className="w-4 h-4" /></Button>
                       </Link>
                       {(p?.estado === 'borrador' || p?.estado === 'enviado' || p?.estado === 'recibido') && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(p?.id)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(p?.id)} aria-label="Eliminar pedido">
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       )}

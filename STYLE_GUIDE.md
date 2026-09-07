@@ -219,3 +219,45 @@ Centered card on gradient background. Use for login, signup, onboarding flows.
 | `ToggleGroup` | `@/components/ui/toggle-group` |
 | `Collapsible` | `@/components/ui/collapsible` |
 | `ThemeToggle` | `@/components/theme-toggle` — light/dark mode switch |
+
+---
+
+## Estado visual (color como información)
+
+**Regla:** el color NUNCA es la única señal. Todo estado lleva forma + icono + texto + color, y respeta `prefers-reduced-motion`.
+
+### Tokens semánticos (light & dark)
+
+| Token | Uso |
+|------|-----|
+| `success` / `success.soft` | Correcto, en temporada, sin incidencias |
+| `warning` / `warning.soft` | Atención, diferencias, fuera de temporada |
+| `info` / `info.soft` | Información, en curso |
+| `danger` / `danger.soft` | Problema, no llegó, error |
+
+Uso: `bg-success-soft text-success`, `bg-warning-soft text-warning`, `bg-danger-soft text-danger`, `bg-info-soft text-info`.
+
+### Componentes de estado — `@/components/ui/status-viz`
+
+| Componente | Uso | Props clave |
+|-----------|-----|-------------|
+| `StatusDot` | Punto de estado | `tone`, `size` |
+| `StatusBadge` | Píldora estado (icono+texto+color+borde) | `tone`, `label`, `icon`, `size` |
+| `ProgressBar` | Barra de progreso accesible | `value`, `label`, `tone`, `showLabel` |
+| `ProgressRing` | Anillo de progreso | `value`, `size`, `stroke`, `tone`, `label` |
+| `OrderStepper` | Stepper de la vida de un pedido | `steps`, `currentIndex`, `tone` |
+| `CompareBar` | Pedido vs recibido (2 barras) | `ordered`, `received`, `unit` |
+| `Busy` | Indicador de carga con texto | `label` |
+
+### Modelo de estado de pedido — `@/lib/status`
+
+`PEDIDO_ESTADOS` = `['borrador','enviado','recibido']`. Usar `estadoProgress`, `estadoLabel`, `estadoIndex`, `PEDIDO_ESTADO_META` para no duplicar etiquetas ni colores.
+
+### Componentes de dominio
+
+- `@/components/ui/order-status-header` — Cabecera de pedido con stepper + progreso + metadatos.
+- `@/components/ui/season-badge` — Badge de temporada con colores semánticos (usa el motor de temporalidad).
+- `@/components/recommendation-panel` — Panel de recomendaciones contextuales (evidencia + tono).
+- `@/lib/status` — Modelo de estados.
+- `@/lib/seasonality` — Motor de temporalidad (`engine.ts`, `data.ts`, `types.ts`); `lib/temporada.ts` es un shim de compatibilidad.
+- `@/lib/ai` — Capa de IA: `gemini.ts` (cliente único), `prompts.ts`, `recommendations.ts`, `insights.ts`, `anomalies.ts`, `summaries.ts`, `rate-limit.ts`, `types.ts`. **La IA interpreta datos reales, nunca los inventa.**

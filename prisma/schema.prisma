@@ -86,10 +86,10 @@ model Pedido {
   fechaEntrega    DateTime?
   tipoPedido      String?
   estado          String          @default("borrador")
-  creadoPor       String
+  creadoPor       String?         // Nullable: la app es de acceso público y los pedidos pueden crearse sin sesión
   notas           String?         @db.Text
   extrasAlbaran   Json?           // Extras y no registrados detectados al recibir
-  user            User            @relation(fields: [creadoPor], references: [id])
+  user            User?           @relation(fields: [creadoPor], references: [id])
   detalles        DetallePedido[]
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt

@@ -150,7 +150,7 @@ export function UsuariosClient() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-display flex items-center justify-between">
                 <span>{editingId ? 'Editar usuario' : 'Nuevo usuario'}</span>
-                <Button variant="ghost" size="icon" onClick={resetForm}><X className="w-4 h-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={resetForm} aria-label="Cerrar"><X className="w-4 h-4" /></Button>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -216,11 +216,11 @@ export function UsuariosClient() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(u)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(u)} aria-label="Editar usuario">
                       <Edit3 className="w-3.5 h-3.5" />
                     </Button>
                     {(session?.user as any)?.id !== u.id && (
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(u.id, u.name)}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(u.id, u.name)} aria-label={`Eliminar ${u.name ?? 'usuario'}`}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     )}

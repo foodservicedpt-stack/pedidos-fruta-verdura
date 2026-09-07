@@ -2,11 +2,10 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAuth } from '@/lib/api-helpers';
+import { optionalAuth } from '@/lib/api-helpers';
 
 export async function GET() {
-  const auth = await requireAuth();
-  if ('response' in auth) return auth.response;
+  const auth = await optionalAuth();
 
   try {
     // Consultas independientes en paralelo para reducir viajes a la base de datos

@@ -97,9 +97,9 @@ export function CalendarioClient() {
       <Card style={{ boxShadow: 'var(--shadow-sm)' }}>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <Button variant="ghost" size="icon" onClick={prevMonth}><ChevronLeft className="w-5 h-5" /></Button>
+            <Button variant="ghost" size="icon" onClick={prevMonth} aria-label="Mes anterior"><ChevronLeft className="w-5 h-5" /></Button>
             <CardTitle className="font-display text-lg">{MESES[month]} {year}</CardTitle>
-            <Button variant="ghost" size="icon" onClick={nextMonth}><ChevronRight className="w-5 h-5" /></Button>
+            <Button variant="ghost" size="icon" onClick={nextMonth} aria-label="Mes siguiente"><ChevronRight className="w-5 h-5" /></Button>
           </div>
         </CardHeader>
         <CardContent>

@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { History, Search, Filter, TrendingUp, Calendar } from 'lucide-react';
+import { History, Search, Filter, TrendingUp, TrendingDown, Calendar, Minus } from 'lucide-react';
 import { FadeIn } from '@/components/ui/animate';
+import { SeasonBadge } from '@/components/ui/season-badge';
+import { StatusBadge } from '@/components/ui/status-viz';
 
 export function HistorialClient() {
   const [historicos, setHistoricos] = useState<any[]>([]);
@@ -98,18 +100,36 @@ export function HistorialClient() {
           </Card>
         ) : (
           filteredProducts.map((g: any) => {
-            const avg = (g?.registros ?? []).reduce((sum: number, r: any) => sum + (r?.cantidad ?? 0), 0) / Math.max((g?.registros ?? []).length, 1);
-            const last = (g?.registros ?? []).sort((a: any, b: any) => new Date(b?.fecha ?? 0).getTime() - new Date(a?.fecha ?? 0).getTime())?.[0];
+            const registros = (g?.registros ?? []).slice().sort((a: any, b: any) => new Date(a?.fecha ?? 0).getTime() - new Date(b?.fecha ?? 0).getTime());
+            const avg = registros.reduce((sum: number, r: any) => sum + (r?.cantidad ?? 0), 0) / Math.max(registros.length, 1);
+            const last = registros[registros.length - 1];
+            const half = Math.floor(registros.length / 2);
+            const firstAvg = registros.slice(0, half).reduce((s: number, r: any) => s + (r?.cantidad ?? 0), 0) / Math.max(half, 1);
+            const secondAvg = registros.slice(half).reduce((s: number, r: any) => s + (r?.cantidad ?? 0), 0) / Math.max(registros.length - half, 1);
+            const trend = registros.length >= 4 ? (secondAvg > firstAvg * 1.08 ? 'sube' : secondAvg < firstAvg * 0.92 ? 'baja' : 'estable') : null;
+            const trendBadge = trend === 'sube' ? <StatusBadge tone="success" icon={TrendingUp} size="sm" label="Subiendo" /> : trend === 'baja' ? <StatusBadge tone="danger" icon={TrendingDown} size="sm" label="Bajando" /> : trend ? <StatusBadge tone="muted" icon={Minus} size="sm" label="Estable" /> : null;
             return (
               <Card key={g?.nombre} style={{ boxShadow: 'var(--shadow-sm)' }} className="hover:translate-y-[-1px] transition-transform">
                 <CardContent className="p-4">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium">{g?.nombre}</span>
-                        <Badge variant="outline" className="text-xs">{g?.categoria}</Badge>
+                        <SeasonBadge nombre={g?.nombre} size="sm" />
+                        {trendBadge}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">{(g?.registros ?? []).length} registros</p>
+                      <p className="text-xs text-muted-foreground mt-1">{g?.categoria} · {(g?.registros ?? []).length} registros</p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Promedio</p>
+                        <p className="text-sm font-mono">{Math.round(avg * 10) / 10} {g?.unidad}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground flex items-center gap-1"><Calendar className="w-3 h-3" /> Último</p>
+                        <p className="text-sm font-mono">{last?.cantidad ?? 0} {g?.unidad}</p>
+                        <p className="text-xs text-muted-foreground">{last?.fecha ? new Date(last.fecha).toLocaleDateString('es-ES') : ''}</p>
+                      </div>
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right">

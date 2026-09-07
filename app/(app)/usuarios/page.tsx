@@ -1,13 +1,13 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { redirect } from 'next/navigation';
 import { UsuariosClient } from './_components/usuarios-client';
 
 export const dynamic = 'force-dynamic';
 
 export default async function UsuariosPage() {
-  const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
-  if ((session?.user as any)?.role !== 'admin') redirect('/dashboard');
+  // Acceso público al resto de la app; la gestión de usuarios queda restringida
+  // a administradores dentro del cliente (y en la API con requireAdmin).
+  const session = await getServerSession(authOptions).catch(() => null);
+  void session;
   return <UsuariosClient />;
 }

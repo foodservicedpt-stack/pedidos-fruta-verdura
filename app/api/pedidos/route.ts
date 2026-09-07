@@ -2,11 +2,10 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAuth } from '@/lib/api-helpers';
+import { optionalAuth } from '@/lib/api-helpers';
 
 export async function GET(req: Request) {
-  const auth = await requireAuth();
-  if ('response' in auth) return auth.response;
+  const auth = await optionalAuth();
 
   try {
     const url = new URL(req.url);
@@ -36,15 +35,13 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const auth = await requireAuth();
-  if ('response' in auth) return auth.response;
+  const auth = await optionalAuth();
 
   try {
     const body = await req.json();
     const { tipoPedido, fechaEntrega, notas, detalles, estado } = body ?? {};
-    const userId = auth.user.id;
-
-    if (!userId) return NextResponse.json({ error: 'Usuario no válido' }, { status: 400 });
+    // La app es de acceso público: si hay sesión se atribuye al autor; si no, null.
+    const userId = auth.user?.id ?? null;
 
     const pedido = await prisma.pedido.create({
       data: {

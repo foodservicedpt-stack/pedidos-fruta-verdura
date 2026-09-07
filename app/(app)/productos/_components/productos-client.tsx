@@ -13,8 +13,9 @@ import {
 import { toast } from 'sonner';
 import { FadeIn } from '@/components/ui/animate';
 import { cn } from '@/lib/utils';
-import { getTemporadaInfo, MESES_NOMBRES } from '@/lib/temporada';
+import { MESES_NOMBRES } from '@/lib/temporada';
 import { CATEGORIAS } from '@/lib/constants';
+import { SeasonBadge } from '@/components/ui/season-badge';
 
 interface Producto {
   id: number;
@@ -154,7 +155,7 @@ export function ProductosClient({ isAdmin = false }: { isAdmin?: boolean }) {
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-display flex items-center justify-between">
                 <span>{editingId ? 'Editar producto' : 'Nuevo producto'}</span>
-                <Button variant="ghost" size="icon" onClick={resetForm}><X className="w-4 h-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={resetForm} aria-label="Cerrar"><X className="w-4 h-4" /></Button>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -235,7 +236,6 @@ export function ProductosClient({ isAdmin = false }: { isAdmin?: boolean }) {
             ) : (
               <div className="space-y-2">
                 {filtered.map(p => {
-                  const tempInfo = getTemporadaInfo(p.nombre, p.mesInicioTemp, p.mesFinTemp);
                   return (
                     <Card key={p.id} style={{ boxShadow: 'var(--shadow-sm)' }} className="hover:bg-accent/30 transition-colors">
                       <CardContent className="p-3">
@@ -244,18 +244,16 @@ export function ProductosClient({ isAdmin = false }: { isAdmin?: boolean }) {
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-sm font-medium">{p.nombre}</span>
                               <Badge variant="outline" className="text-xs">{p.unidad}</Badge>
-                              <Badge variant="outline" className={cn('text-xs', tempInfo.color, tempInfo.bgColor, tempInfo.borderColor)}>
-                                {tempInfo.label}
-                              </Badge>
+                              <SeasonBadge nombre={p.nombre} mesInicio={p.mesInicioTemp} mesFin={p.mesFinTemp} size="sm" />
                             </div>
                             {p.notas && <p className="text-xs text-muted-foreground mt-0.5">{p.notas}</p>}
                           </div>
                           {isAdmin && (
                             <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(p)}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(p)} aria-label="Editar producto">
                                 <Edit3 className="w-3.5 h-3.5" />
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(p.id, p.nombre)}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(p.id, p.nombre)} aria-label={`Desactivar ${p.nombre}`}>
                                 <Trash2 className="w-3.5 h-3.5" />
                               </Button>
                             </div>

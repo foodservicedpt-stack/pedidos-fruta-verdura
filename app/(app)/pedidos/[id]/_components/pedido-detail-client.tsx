@@ -16,6 +16,9 @@ import {
 import { toast } from 'sonner';
 import { FadeIn } from '@/components/ui/animate';
 import { estadoLabel, estadoColor, tipoLabel, catIcons, type ScanFileEntry } from './pedido-detail-constants';
+import { OrderStatusHeader } from '@/components/ui/order-status-header';
+import { CompareBar, StatusBadge } from '@/components/ui/status-viz';
+import { detectAnomalies, countAnomalies } from '@/lib/ai/anomalies';
 import { PedidoIncidencias } from './pedido-incidencias';
 
 export function PedidoDetailClient({ pedidoId }: { pedidoId: string }) {
@@ -425,8 +428,8 @@ export function PedidoDetailClient({ pedidoId }: { pedidoId: string }) {
     if (!receiving || !ocrDone) return '';
     const received = receivedQtys[d.id] ?? 0;
     const ordered = d?.cantidadSolicitada ?? 0;
-    if (received > ordered) return 'bg-red-50 border-l-4 border-red-400';
-    if (received < ordered) return 'bg-amber-50 border-l-4 border-amber-400';
+    if (received > ordered) return 'bg-danger-soft border-l-4 border-danger/40';
+    if (received < ordered) return 'bg-warning-soft border-l-4 border-warning/40';
     return '';
   };
 
@@ -437,15 +440,15 @@ export function PedidoDetailClient({ pedidoId }: { pedidoId: string }) {
     const ordered = d?.cantidadSolicitada ?? 0;
     const diff = received - ordered;
     if (diff > 0) {
-      return <span className="text-xs font-semibold text-red-600 whitespace-nowrap">▲ +{Number.isInteger(diff) ? diff : diff.toFixed(1)}</span>;
+      return <span className="text-xs font-semibold text-danger whitespace-nowrap">▲ +{Number.isInteger(diff) ? diff : diff.toFixed(1)}</span>;
     }
     if (diff < 0) {
       if (notArrivedIds.has(d.id)) {
-        return <span className="text-xs font-semibold text-red-600 whitespace-nowrap">⚠️ No llegó</span>;
+        return <span className="text-xs font-semibold text-danger whitespace-nowrap">⚠️ No llegó</span>;
       }
-      return <span className="text-xs font-semibold text-amber-600 whitespace-nowrap">▼ {Number.isInteger(diff) ? diff : diff.toFixed(1)}</span>;
+      return <span className="text-xs font-semibold text-warning whitespace-nowrap">▼ {Number.isInteger(diff) ? diff : diff.toFixed(1)}</span>;
     }
-    return <span className="text-xs font-semibold text-green-600 whitespace-nowrap">✓ OK</span>;
+    return <span className="text-xs font-semibold text-success whitespace-nowrap">✓ OK</span>;
   };
 
   if (loading) {
@@ -469,18 +472,11 @@ export function PedidoDetailClient({ pedidoId }: { pedidoId: string }) {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link href="/pedidos">
-              <Button variant="ghost" size="icon"><ArrowLeft className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" aria-label="Volver"><ArrowLeft className="w-4 h-4" /></Button>
             </Link>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-display text-2xl font-bold tracking-tight">Pedido #{pedido?.id}</h1>
-                <Badge className={estadoColor[pedido?.estado] ?? ''}>{estadoLabel[pedido?.estado] ?? pedido?.estado}</Badge>
-              </div>
-              <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{pedido?.fechaPedido ? new Date(pedido.fechaPedido).toLocaleDateString('es-ES') : ''}</span>
-                <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" />{pedido?.user?.name ?? 'Usuario'}</span>
-                {pedido?.tipoPedido && <span>{tipoLabel[pedido?.tipoPedido] ?? pedido?.tipoPedido}</span>}
-              </div>
+              <h1 className="font-display text-2xl font-bold tracking-tight">Pedido #{pedido?.id}</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">Gestiona el estado, la recepción y las incidencias del pedido.</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -541,6 +537,10 @@ export function PedidoDetailClient({ pedidoId }: { pedidoId: string }) {
             )}
           </div>
         </div>
+      </FadeIn>
+
+      <FadeIn delay={0.05}>
+        <OrderStatusHeader pedido={pedido} />
       </FadeIn>
 
       {/* Receiving mode banner */}
@@ -884,6 +884,9 @@ export function PedidoDetailClient({ pedidoId }: { pedidoId: string }) {
                           )}
                         </div>
                         {d?.comentario && <p className="text-xs text-muted-foreground mt-0.5">{d?.comentario}</p>}
+                        {receiving && ocrDone && (
+                          <CompareBar className="mt-2 max-w-[200px]" ordered={d?.cantidadSolicitada ?? 0} received={receivedQtys[d.id] ?? 0} unit={d?.producto?.unidad ?? ''} />
+                        )}
                       </div>
                       <div className="text-right flex items-center gap-3">
                         {receiving ? (
@@ -931,6 +934,45 @@ export function PedidoDetailClient({ pedidoId }: { pedidoId: string }) {
           </FadeIn>
         );
       })}
+
+      {/* Resumen de diferencias (determinista) para pedidos recibidos */}
+      {!receiving && !editing && pedido?.estado === 'recibido' && (() => {
+        const anoms = detectAnomalies({
+          detalles: (pedido?.detalles ?? []).filter((d: any) => d?.cantidadRecibida != null).map((d: any) => ({
+            detalleId: d.id,
+            productoId: d.productoId,
+            nombre: d.producto?.nombre ?? 'Producto',
+            unidad: d.producto?.unidad ?? '',
+            cantidadSolicitada: d.cantidadSolicitada ?? 0,
+            cantidadRecibida: d.cantidadRecibida ?? 0,
+          })),
+          extras: pedido?.extrasAlbaran?.extras ?? [],
+          noRegistrados: pedido?.extrasAlbaran?.noRegistrados ?? [],
+        });
+        const { total, danger, warning } = countAnomalies(anoms);
+        if (total === 0) return null;
+        return (
+          <FadeIn delay={0.15}>
+            <Card className={danger > 0 ? 'border-danger/30' : 'border-warning/30'} style={{ boxShadow: 'var(--shadow-sm)' }}>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {danger > 0 && <StatusBadge tone="danger" label={danger + ' para revisar'} />}
+                  {warning > 0 && <StatusBadge tone="warning" label={warning + ' diferencias'} />}
+                  <span className="text-sm text-muted-foreground">se detectaron en la recepción</span>
+                </div>
+                <div className="mt-3 space-y-1.5 max-h-[200px] overflow-y-auto">
+                  {anoms.map(a => (
+                    <div key={a.id} className="flex items-center justify-between text-sm py-1 border-b border-border/60 last:border-0">
+                      <span className="flex items-center gap-2"><StatusBadge tone={a.tono as any} size="sm" label={a.titulo} /></span>
+                      <span className="text-xs text-muted-foreground text-right">{a.detalle}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </FadeIn>
+        );
+      })()}
 
       {/* Merma tracking section for received orders */}
       {!receiving && !editing && pedido?.estado === 'recibido' && (

@@ -6,8 +6,9 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint . --no-error-on-unmatched-pattern",
     "typecheck": "tsc --noEmit",
+    "test": "tsx scripts/test-seasonality.ts && tsx scripts/test-ai-logic.ts && tsx scripts/test-status.ts",
     "prisma:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed"

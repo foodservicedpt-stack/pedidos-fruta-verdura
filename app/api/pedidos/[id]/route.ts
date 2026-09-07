@@ -2,11 +2,10 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { parseIntId, requireAuth } from '@/lib/api-helpers';
+import { parseIntId, optionalAuth } from '@/lib/api-helpers';
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
-  const auth = await requireAuth();
-  if ('response' in auth) return auth.response;
+  const auth = await optionalAuth();
 
   const id = parseIntId(params?.id);
   if (id === null) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
@@ -30,8 +29,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 }
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
-  const auth = await requireAuth();
-  if ('response' in auth) return auth.response;
+  const auth = await optionalAuth();
 
   try {
     const body = await req.json();
@@ -104,8 +102,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 }
 
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
-  const auth = await requireAuth();
-  if ('response' in auth) return auth.response;
+  const auth = await optionalAuth();
 
   try {
     const pedidoId = parseIntId(params?.id);

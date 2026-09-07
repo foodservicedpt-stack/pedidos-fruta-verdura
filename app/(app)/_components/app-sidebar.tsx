@@ -47,6 +47,9 @@ export function AppSidebar({ user }: { user: any }) {
         className="fixed top-3 left-3 z-50 lg:hidden p-2 rounded-lg bg-card border"
         style={{ boxShadow: 'var(--shadow-sm)' }}
         onClick={() => setMobileOpen(!mobileOpen)}
+        aria-label="Abrir menú de navegación"
+        aria-expanded={mobileOpen}
+        aria-controls="app-sidebar"
       >
         {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
       </button>
@@ -55,15 +58,18 @@ export function AppSidebar({ user }: { user: any }) {
         <div
           className="fixed inset-0 z-40 bg-black/30 lg:hidden"
           onClick={() => setMobileOpen(false)}
+          aria-hidden
         />
       )}
 
       <aside
+        id="app-sidebar"
         className={cn(
-          'fixed lg:static z-40 top-0 left-0 h-full w-64 bg-card border-r flex flex-col transition-transform duration-300',
+          'fixed lg:static z-40 top-0 left-0 h-full w-64 bg-card border-r flex flex-col transition-transform duration-300 motion-reduce:transition-none',
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
         style={{ boxShadow: 'var(--shadow-md)' }}
+        aria-label="Navegación principal"
       >
         <div className="p-5 border-b">
           <Link href="/dashboard" className="flex items-center gap-3">
@@ -126,24 +132,38 @@ export function AppSidebar({ user }: { user: any }) {
         </nav>
 
         <div className="p-3 border-t">
-          <div className="flex items-center gap-3 px-3 py-2">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-              {(user?.name ?? user?.email ?? 'U')?.[0]?.toUpperCase?.() ?? 'U'}
+          {user ? (
+            <>
+              <div className="flex items-center gap-3 px-3 py-2">
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                  {(user?.name ?? user?.email ?? 'U')?.[0]?.toUpperCase?.() ?? 'U'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{user?.name ?? 'Usuario'}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.email ?? ''}</p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start gap-2 text-muted-foreground mt-1"
+                onClick={() => signOut({ callbackUrl: '/login' })}
+              >
+                <LogOut className="w-4 h-4" />
+                Cerrar sesión
+              </Button>
+            </>
+          ) : (
+            <div className="flex items-center gap-2.5 px-3 py-2 text-muted-foreground">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <Leaf className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">Equipo</p>
+                <p className="text-xs truncate">Acceso de uso interno</p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{user?.name ?? 'Usuario'}</p>
-              <p className="text-xs text-muted-foreground truncate">{user?.email ?? ''}</p>
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start gap-2 text-muted-foreground mt-1"
-            onClick={() => signOut({ callbackUrl: '/login' })}
-          >
-            <LogOut className="w-4 h-4" />
-            Cerrar sesión
-          </Button>
+          )}
         </div>
       </aside>
     </>

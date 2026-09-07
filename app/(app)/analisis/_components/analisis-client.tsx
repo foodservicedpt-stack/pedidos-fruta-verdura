@@ -7,10 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart3, TrendingUp, Search, Leaf, Apple, Salad, ArrowLeft } from 'lucide-react';
+import { BarChart3, TrendingUp, TrendingDown, Search, Leaf, Apple, Salad, ArrowLeft } from 'lucide-react';
 import { FadeIn } from '@/components/ui/animate';
 import { cn } from '@/lib/utils';
 import { CATEGORIAS } from '@/lib/constants';
+import { SeasonBadge } from '@/components/ui/season-badge';
+
+interface Insight { productoId: number; nombre: string; categoria: string; unidad: string; promedio: number; ultima: number; variacion: number | null; tendencia: 'sube' | 'baja' | 'estable' | null; numPedidos: number; mensajes: string[]; temporada: any; }
 
 const ProductTrendChart = dynamic(() => import('./product-trend-chart'), { ssr: false, loading: () => <div className="h-64 bg-muted rounded-lg animate-pulse" /> });
 
@@ -45,12 +48,15 @@ export function AnalisisClient() {
   const [selectedProduct, setSelectedProduct] = useState<ProductoStats | null>(null);
   const [trendData, setTrendData] = useState<ProductTrend | null>(null);
   const [loadingTrend, setLoadingTrend] = useState(false);
+  const [insight, setInsight] = useState<Insight | null>(null);
+  const [allInsights, setAllInsights] = useState<Insight[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch('/api/analisis/producto');
+        const [res, insRes] = await Promise.all([fetch('/api/analisis/producto'), fetch('/api/analisis/insights')]);
         if (res.ok) setProductos(await res.json());
+        if (insRes.ok) setAllInsights(await insRes.json());
       } catch (err: any) {
         console.error(err?.message);
       } finally {
@@ -66,6 +72,10 @@ export function AnalisisClient() {
     try {
       const res = await fetch(`/api/analisis/producto?productoId=${p.id}`);
       if (res.ok) setTrendData(await res.json());
+      try {
+        const iRes = await fetch('/api/analisis/insights?productoId=' + p.id);
+        if (iRes.ok) { const arr = await iRes.json(); setInsight(arr?.[0] ?? null); }
+      } catch (e) {}
     } catch (err: any) {
       console.error(err?.message);
     } finally {
@@ -85,7 +95,7 @@ export function AnalisisClient() {
       <div className="p-4 lg:p-8 max-w-[1200px] mx-auto space-y-6">
         <FadeIn>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => { setSelectedProduct(null); setTrendData(null); }}>
+            <Button variant="ghost" size="icon" onClick={() => { setSelectedProduct(null); setTrendData(null); }} aria-label="Volver">
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <div>
@@ -114,6 +124,23 @@ export function AnalisisClient() {
             </Card>
           ))}
         </div>
+
+        <FadeIn delay={0.08}>
+          <Card style={{ boxShadow: 'var(--shadow-sm)' }} className="border-primary/10">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <SeasonBadge nombre={selectedProduct.nombre} size="md" />
+                {insight?.tendencia === 'sube' && <Badge variant="outline" className="text-xs border-success/30 text-success bg-success-soft">▲ En aumento</Badge>}
+                {insight?.tendencia === 'baja' && <Badge variant="outline" className="text-xs border-danger/30 text-danger bg-danger-soft">▼ En descenso</Badge>}
+              </div>
+              {(insight?.mensajes?.length ?? 0) > 0 && (
+                <div className="space-y-1">
+                  {(insight?.mensajes ?? []).map((m: string, i: number) => <p key={i} className="text-sm text-muted-foreground">{m}</p>)}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </FadeIn>
 
         <FadeIn delay={0.1}>
           <Card style={{ boxShadow: 'var(--shadow-sm)' }}>
@@ -147,6 +174,35 @@ export function AnalisisClient() {
           <p className="text-muted-foreground text-sm mt-1">Selecciona un producto para ver su tendencia de consumo</p>
         </div>
       </FadeIn>
+
+      {(() => {
+        const most = [...(allInsights ?? [])].sort((a, b) => (b.numPedidos ?? 0) - (a.numPedidos ?? 0))[0];
+        const up = (allInsights ?? []).filter(i => i.tendencia === 'sube');
+        const down = (allInsights ?? []).filter(i => i.tendencia === 'baja');
+        if (!most && up.length === 0 && down.length === 0) return null;
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {most && (
+              <div className="rounded-xl border bg-card p-3 flex items-center gap-3" style={{ boxShadow: 'var(--shadow-sm)' }}>
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary"><BarChart3 className="w-5 h-5" /></div>
+                <div className="min-w-0"><p className="text-xs text-muted-foreground">Lo más pedido</p><p className="text-sm font-semibold truncate">{most.nombre}</p></div>
+              </div>
+            )}
+            {up[0] && (
+              <div className="rounded-xl border bg-success-soft/50 p-3 flex items-center gap-3" style={{ boxShadow: 'var(--shadow-sm)' }}>
+                <div className="w-9 h-9 rounded-lg bg-success/15 flex items-center justify-center text-success"><TrendingUp className="w-5 h-5" /></div>
+                <div className="min-w-0"><p className="text-xs text-success">En aumento</p><p className="text-sm font-semibold truncate">{up[0].nombre}</p></div>
+              </div>
+            )}
+            {down[0] && (
+              <div className="rounded-xl border bg-danger-soft/50 p-3 flex items-center gap-3" style={{ boxShadow: 'var(--shadow-sm)' }}>
+                <div className="w-9 h-9 rounded-lg bg-danger/15 flex items-center justify-center text-danger"><TrendingDown className="w-5 h-5" /></div>
+                <div className="min-w-0"><p className="text-xs text-danger">En descenso</p><p className="text-sm font-semibold truncate">{down[0].nombre}</p></div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
