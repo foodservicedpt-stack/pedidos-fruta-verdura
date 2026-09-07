@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Pedidos Fruta y Verdura">
+  <rect width="64" height="64" rx="14" fill="#16a34a"/>
+  <circle cx="32" cy="35" r="16" fill="#ffffff"/>
+  <ellipse cx="32" cy="17.5" rx="11" ry="5.5" fill="#ffffff"/>
+  <path d="M32 23 C32 19 30 16 28 14" stroke="#16a34a" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+</svg>

@@ -3,8 +3,17 @@ import './globals.css';
 import { Providers } from '@/components/providers';
 import { Toaster } from '@/components/ui/sonner';
 import { ChunkLoadErrorHandler } from '@/components/chunk-load-error-handler';
+import type { Viewport } from 'next';
 
 export const dynamic = 'force-dynamic';
+
+// PWA / iOS: viewport con viewport-fit=cover para que env(safe-area-inset-*) funcione.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#16a34a',
+};
 
 const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-sans' });
 const jakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-display' });
@@ -12,14 +21,21 @@ const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mon
 
 export const metadata = {
   title: 'Pedidos Fruta y Verdura',
-  description: 'Sistema de gestión de pedidos de fruta y verdura para hostelería',
+  description: 'Gestor operativo e inteligente de fruta y verdura para hostelería',
+  manifest: '/manifest.webmanifest',
   icons: {
-    icon: '/favicon.svg',
-    shortcut: '/favicon.svg',
+    icon: '/icons/icon-192.png',
+    shortcut: '/icons/icon-192.png',
+    apple: '/icons/apple-touch-icon.png',
+  },
+  appleWebApp: {
+    capable: true,
+    title: 'Fruta y Verdura',
+    statusBarStyle: 'default',
   },
   openGraph: {
     title: 'Pedidos Fruta y Verdura',
-    description: 'Sistema de gestión de pedidos de fruta y verdura para hostelería',
+    description: 'Gestor operativo e inteligente de fruta y verdura para hostelería',
     images: ['/og-image.png'],
   },
 };
