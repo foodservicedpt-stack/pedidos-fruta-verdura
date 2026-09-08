@@ -110,14 +110,25 @@ export async function callGeminiJSON<T>(options: GeminiCallOptions): Promise<Gem
   try {
     const content = await callGeminiRaw(options);
     if (!content || !content.trim()) return { ok: false, error: 'No se pudo generar una respuesta.' };
-    const trimmed = content.trim();
-    const cleaned = trimmed.replace(/^```json?/i, '').replace(/```\s*$/, '').trim();
-    const parsed = JSON.parse(cleaned) as T;
+    const trimmed = content.trim().replace(/^```json?/i, '').replace(/```\s*$/, '').trim();
+    // Parseo tolerante: si el JSON envuelve texto extra, extraer la primera persona JSON.
+    const parsed = tryParseJSON<T>(trimmed);
+    if (parsed === null) return { ok: false, error: options.defaultError ?? 'No se ha podido generar la recomendación ahora mismo.' };
     return { ok: true, data: parsed };
   } catch (e) {
     console.error('[gemini] error:', (e as Error)?.message);
     return { ok: false, error: options.defaultError ?? 'No se ha podido generar la recomendación ahora mismo.' };
   }
+}
+
+/** Intenta JSON.parse directo; si falla, extrae la primera persona { ... } y la parsea. */
+function tryParseJSON<T>(s: string): T | null {
+  try { return JSON.parse(s) as T; } catch {}
+  const m = s.match(/\{[\s\S]*\}/);
+  if (m) {
+    try { return JSON.parse(m[0]) as T; } catch {}
+  }
+  return null;
 }
 
 /** Convierte un File/Blob servidor a payload de visión en base64. */
