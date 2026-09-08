@@ -45,7 +45,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: 'Formato no soportado. Usa PDF o imagen (JPG, PNG).' }, { status: 400 });
     }
     if (file.size > MAX_FILE_BYTES) {
-      return NextResponse.json({ error: 'El archivo supera el tamaño máximo permitido (8 MB).' }, { status: 413 });
+      return NextResponse.json({ error: 'El archivo supera el tamaño máximo permitido (4 MB).' }, { status: 413 });
     }
 
     const orderProductList = (pedido.detalles ?? []).map((d: any) =>
@@ -68,6 +68,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       image: vision,
       maxTokens: 3000,
       temperature: 0.1,
+      retries: 2,
+      defaultError: 'No se pudo leer el albarán con la IA. Prueba con un PDF o imagen más nítida y de menos de 4 MB, o introduce las cantidades manualmente.',
     });
 
     if (!result.ok) {

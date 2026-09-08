@@ -28,6 +28,10 @@ export interface GeminiCallOptions {
   image?: VisionPayload | null;
   maxTokens?: number;
   temperature?: number;
+  /** Mensaje por defecto cuando falla la llamada (contextual por caller). */
+  defaultError?: string;
+  /** Número de reintentos para errores transitorios (429/5xx/timeout). */
+  retries?: number;
 }
 
 interface GeminiRawResponse {
@@ -35,7 +39,8 @@ interface GeminiRawResponse {
   error?: { message?: string };
 }
 
-async function callGeminiRaw({ prompt, image, maxTokens = 2000, temperature = 0.2 }: GeminiCallOptions): Promise<string> {
+async function callGeminiRaw(options: GeminiCallOptions): Promise<string> {
+  const { prompt, image, maxTokens = 2000, temperature = 0.2, retries = 1 } = options;
   if (!GEMINI_KEY) {
     throw new Error('GEMINI_API_KEY no configurada');
   }
@@ -54,32 +59,50 @@ async function callGeminiRaw({ prompt, image, maxTokens = 2000, temperature = 0.
     },
   };
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 45_000);
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 700 * attempt));
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45_000);
+    try {
+      const res = await fetch(`${GEMINI_URL}/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
 
-  try {
-    const res = await fetch(`${GEMINI_URL}/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        console.error('[gemini] HTTP error', res.status, text.slice(0, 300));
+        // Reintento en 429/5xx (transitorio); fallo definitivo en el resto.
+        if ((res.status === 429 || res.status >= 500) && attempt < retries) {
+          lastError = new Error('Error del servicio de IA (' + res.status + ')');
+          continue;
+        }
+        throw new Error('Error del servicio de IA (' + res.status + ')');
+      }
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      console.error('[gemini] HTTP error', res.status, text.slice(0, 300));
-      throw new Error('Error del servicio de IA (' + res.status + ')');
+      const result = (await res.json()) as GeminiRawResponse;
+      const content = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!content) {
+        if (attempt < retries) { lastError = new Error('Respuesta vacía del servicio de IA.'); continue; }
+        throw new Error('Respuesta vacía del servicio de IA.');
+      }
+      return content;
+    } catch (e) {
+      const err = e as Error;
+      const transient = err?.name === 'AbortError' || /Error del servicio de IA/.test(err?.message || '');
+      if (attempt < retries && (transient || /Respuesta vacía/.test(err?.message || ''))) {
+        lastError = err;
+        continue;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const result = (await res.json()) as GeminiRawResponse;
-    const content = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!content) {
-      throw new Error('Respuesta vacía del servicio de IA.');
-    }
-    return content;
-  } finally {
-    clearTimeout(timeout);
   }
+  throw lastError ?? new Error('Error del servicio de IA');
 }
 
 /** Llama a Gemini pidiendo JSON y devuelve el dato tipado o un error amigable. */
@@ -93,7 +116,7 @@ export async function callGeminiJSON<T>(options: GeminiCallOptions): Promise<Gem
     return { ok: true, data: parsed };
   } catch (e) {
     console.error('[gemini] error:', (e as Error)?.message);
-    return { ok: false, error: 'No se ha podido generar la recomendación ahora mismo.' };
+    return { ok: false, error: options.defaultError ?? 'No se ha podido generar la recomendación ahora mismo.' };
   }
 }
 
