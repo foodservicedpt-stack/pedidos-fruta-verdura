@@ -482,10 +482,10 @@ export function PedidoDetailClient({ pedidoId }: { pedidoId: string }) {
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative" ref={downloadMenuRef}>
               <div className="flex">
-                <Button variant="outline" size="sm" onClick={() => handleDownload('pdf')} disabled={!!downloading} className="gap-1.5 rounded-r-none border-r-0">
-                  <Download className="w-4 h-4" /> {downloading ? 'Generando...' : 'Descargar'}
+                <Button variant="outline" size="sm" onClick={() => handleDownload('excel')} disabled={!!downloading} className="gap-1.5 rounded-r-none border-r-0">
+                  <FileSpreadsheet className="w-4 h-4 text-green-600" /> {downloading ? 'Generando...' : 'Excel'}
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setShowDownloadMenu(!showDownloadMenu)} disabled={!!downloading} className="px-1.5 rounded-l-none">
+                <Button variant="outline" size="sm" onClick={() => setShowDownloadMenu(!showDownloadMenu)} disabled={!!downloading} className="px-1.5 rounded-l-none" aria-label="Más formatos de descarga">
                   <ChevronDown className="w-3.5 h-3.5" />
                 </Button>
               </div>
@@ -494,11 +494,11 @@ export function PedidoDetailClient({ pedidoId }: { pedidoId: string }) {
                   <button onClick={() => handleDownload('pdf')} className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent transition-colors">
                     <FileText className="w-4 h-4 text-red-500" /> PDF
                   </button>
-                  <button onClick={() => handleDownload('excel')} className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent transition-colors">
-                    <FileSpreadsheet className="w-4 h-4 text-green-600" /> Excel (.xlsx)
-                  </button>
                   <button onClick={() => handleDownload('word')} className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent transition-colors">
                     <FileText className="w-4 h-4 text-blue-600" /> Word (.docx)
+                  </button>
+                  <button onClick={() => handleDownload('excel')} className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent transition-colors">
+                    <FileSpreadsheet className="w-4 h-4 text-green-600" /> Excel (.xlsx)
                   </button>
                 </div>
               )}

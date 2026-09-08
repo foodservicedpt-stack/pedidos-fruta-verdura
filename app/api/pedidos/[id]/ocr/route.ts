@@ -7,8 +7,8 @@ import { callGeminiJSON, toVisionPayload } from '@/lib/ai/gemini';
 import { buildOcrPrompt } from '@/lib/ai/prompts';
 import { getClientIp, consumeAICredit } from '@/lib/ai/rate-limit';
 
-/** Límite de tamaño de archivo subido (8 MB) para proteger el endpoint. */
-const MAX_FILE_BYTES = 8 * 1024 * 1024;
+/** Límite de tamaño de archivo subido (4 MB) para proteger el endpoint y estar por debajo del límite de body de Vercel. */
+const MAX_FILE_BYTES = 4 * 1024 * 1024;
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const auth = await optionalAuth();

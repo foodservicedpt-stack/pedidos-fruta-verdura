@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Users, Plus, Trash2, Edit3, Save, X, Shield, User as UserIcon } from 'lucide-react';
+import { Users, Plus, Trash2, Edit3, Save, X, Shield, User as UserIcon, LogIn } from 'lucide-react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { FadeIn } from '@/components/ui/animate';
 import { useRouter } from 'next/navigation';
@@ -123,7 +124,9 @@ export function UsuariosClient() {
     return (
       <div className="p-4 lg:p-8 max-w-[1200px] mx-auto text-center py-20">
         <Shield className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-        <p className="text-muted-foreground">Solo los administradores pueden acceder a esta sección</p>
+        <p className="text-muted-foreground mb-1">Solo los administradores pueden acceder a esta sección</p>
+        <p className="text-xs text-muted-foreground mb-4">Inicia sesión con una cuenta de administrador para gestionar usuarios.</p>
+        <Link href="/login"><Button size="sm" className="gap-1.5"><LogIn className="w-4 h-4" /> Iniciar sesión</Button></Link>
       </div>
     );
   }

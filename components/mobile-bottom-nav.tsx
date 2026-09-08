@@ -11,7 +11,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, ClipboardList, Plus, BarChart3, MoreHorizontal, X, Package, History, CalendarDays, Settings, Users, Leaf } from 'lucide-react';
+import { Home, ClipboardList, Plus, BarChart3, MoreHorizontal, X, Package, History, CalendarDays, Settings, Users, Leaf, LogIn } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const primaryItems = [
@@ -98,6 +98,10 @@ export function MobileBottomNav() {
                 </Link>
               ))}
             </div>
+            <Link href="/login" onClick={() => setMore(false)} className="mt-2 flex items-center gap-3 rounded-xl border bg-primary/5 px-3 py-3 active:scale-[0.98] transition-transform motion-reduce:transition-none">
+              <span className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center"><LogIn className="w-5 h-5" /></span>
+              <span className="text-sm font-medium">Iniciar sesión (admin)</span>
+            </Link>
           </div>
         </div>
       )}

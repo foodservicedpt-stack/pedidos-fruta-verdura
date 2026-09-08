@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import {
-  LayoutDashboard, ClipboardList, History, BarChart3, Settings, LogOut, Leaf, PlusCircle, CalendarDays, Package, Users,
+  LayoutDashboard, ClipboardList, History, BarChart3, Settings, LogOut, Leaf, PlusCircle, CalendarDays, Package, Users, LogIn,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -83,10 +83,13 @@ export function AppSidebar({ user }: { user: any }) {
             </Button>
           </>
         ) : (
-          <div className="flex items-center gap-2.5 px-3 py-2 text-muted-foreground">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary"><Leaf className="w-4 h-4" /></div>
-            <div className="flex-1 min-w-0"><p className="text-sm font-medium text-foreground truncate">Equipo</p><p className="text-xs truncate">Acceso de uso interno</p></div>
-          </div>
+          <>
+            <div className="flex items-center gap-2.5 px-3 py-2 text-muted-foreground">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary"><Leaf className="w-4 h-4" /></div>
+              <div className="flex-1 min-w-0"><p className="text-sm font-medium text-foreground truncate">Equipo</p><p className="text-xs truncate">Inicia sesión para tareas de administrador</p></div>
+            </div>
+            <Link href="/login"><Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-muted-foreground mt-1"><LogIn className="w-4 h-4" /> Iniciar sesión</Button></Link>
+          </>
         )}
       </div>
     </aside>

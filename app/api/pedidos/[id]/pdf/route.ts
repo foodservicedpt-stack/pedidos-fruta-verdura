@@ -2,233 +2,131 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { TIPO_PEDIDO_LABELS } from '@/lib/constants';
 import { parseIntId, optionalAuth } from '@/lib/api-helpers';
+import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
+
+const estadoLabel: Record<string, string> = { borrador: 'Borrador', enviado: 'Enviado', recibido: 'Recibido' };
+const tipoLabel: Record<string, string> = { 'lunes-miercoles': 'Lunes → Miércoles', 'miercoles-viernes': 'Miércoles → Viernes', 'jueves-lunes': 'Jueves → Lunes' };
+const catColors: Record<string, [number, number, number]> = { Verduras: [0.30, 0.69, 0.31], Frutas: [1.0, 0.60, 0.0], Ensaladas: [0.13, 0.59, 0.95] };
+const PH = 841.89, PW = 595.28, M = 40;
+
+async function buildPdf(pedido: any): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const oblique = await doc.embedFont(StandardFonts.HelveticaOblique);
+  const page = doc.addPage([PW, PH]);
+  let top = M;
+
+  // Las fuentes estándar de pdf-lib usan WinAnsi; sustituimos caracteres no soportados.
+  const S = (s: any) => String(s ?? '').replace(/→/g, '-').replace(/←/g, '-').replace(/▲/g, '+').replace(/▼/g, '-').replace(/⚠/g, '!').replace(/✓/g, 'OK').replace(/[^\x00-\xFF]/g, '?');
+  const drawText = (str: string, x: number, size: number, f: PDFFont, color: [number,number,number], width?: number) => {
+    page.drawText(S(str), { x, y: PH - top, size, font: f, color: rgb(color[0], color[1], color[2]), ...(width ? { maxWidth: width } : {}) });
+  };
+  const rule = () => { page.drawLine({ start: { x: M, y: PH - top }, end: { x: PW - M, y: PH - top }, thickness: 1.5, color: rgb(0.30, 0.69, 0.31) }); };
+  const ensureSpace = (needed: number) => { if (top + needed > PH - M) { doc.addPage(); top = M; } };
+
+  // Cabecera
+  drawText('Pedido de Fruta y Verdura', M, 19, bold, [0.18, 0.49, 0.20]);
+  top += 24;
+  drawText('Pedido #' + pedido.id, M, 11, font, [0.40, 0.40, 0.40]);
+  top += 20;
+  rule(); top += 16;
+
+  // Metadatos
+  const metaRows: [string, string][] = [['Estado', estadoLabel[pedido.estado] ?? pedido.estado], ['Fecha pedido', new Date(pedido.fechaPedido).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })]];
+  if (pedido.fechaEntrega) metaRows.push(['Fecha entrega', new Date(pedido.fechaEntrega).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })]);
+  if (pedido.tipoPedido) metaRows.push(['Tipo', tipoLabel[pedido.tipoPedido] ?? pedido.tipoPedido]);
+  metaRows.push(['Creado por', pedido.user?.name ?? 'Equipo']);
+  for (const [k, v] of metaRows) { ensureSpace(18); drawText(k, M, 10, bold, [0.40, 0.40, 0.40]); drawText(v, M + 90, 10, font, [0.20, 0.20, 0.20]); top += 17; }
+  top += 8;
+
+  if (pedido.notas) { ensureSpace(20); drawText('Notas:', M, 10, bold, [0.57, 0.25, 0.05]); drawText(String(pedido.notas), M + 50, 10, font, [0.20, 0.20, 0.20], 480); top += 20; }
+
+  const byCategory: Record<string, any[]> = {};
+  for (const d of (pedido.detalles ?? [])) { const cat = d.producto?.categoria ?? 'Otros'; (byCategory[cat] = byCategory[cat] ?? []).push(d); }
+  const isRecibido = pedido.estado === 'recibido';
+
+  for (const [cat, items] of Object.entries(byCategory)) {
+    ensureSpace(70);
+    const col = catColors[cat] ?? [0.40, 0.40, 0.40];
+    // Cabecera de categoría
+    page.drawRectangle({ x: M, y: PH - top, width: PW - 2 * M, height: 22, color: rgb(col[0], col[1], col[2]) });
+    drawText(cat + ' (' + items.length + ')', M + 6, 12, bold, [1, 1, 1]); top += 28;
+    // Cabecera de tabla
+    const cols = isRecibido ? 5 : 4;
+    const colW = (PW - 2 * M - 4) / cols;
+    const hx = M + 4;
+    drawText('Producto', hx, 9, bold, [0.4, 0.4, 0.4], colW - 4);
+    const centered = (s: string, cx: number, w: number) => {
+      const ss = S(s);
+      const wpx = font.widthOfTextAtSize(ss, 9);
+      page.drawText(ss, { x: cx + (w - wpx) / 2, y: PH - top, size: 9, font: bold, color: rgb(0.4, 0.4, 0.4) });
+    };
+    centered('Cantidad', hx + colW, colW);
+    centered('Unidad', hx + colW * 2, colW);
+    if (isRecibido) centered('Recibido', hx + colW * 3, colW);
+    top += 15;
+    page.drawLine({ start: { x: M, y: PH - top }, end: { x: PW - M, y: PH - top }, thickness: 0.5, color: rgb(0.85, 0.85, 0.85) });
+    top += 6;
+
+    for (const d of items) {
+      ensureSpace(20);
+      const name = d.producto?.nombre ?? 'Producto';
+      const sol = d.cantidadSolicitada ?? 0;
+      const rec = d.cantidadRecibida;
+      const hasDiff = isRecibido && rec !== null && rec !== undefined && rec !== sol;
+      drawText(name, hx, 10, font, [0.20, 0.20, 0.20], colW - 4);
+      const cell = (s: string, cx: number, w: number, c: [number,number,number] = [0.20,0.20,0.20], f: PDFFont = font, sz = 10) => { const ss = S(s); const wpx = f.widthOfTextAtSize(ss, sz); page.drawText(ss, { x: cx + (w - wpx) / 2, y: PH - top, size: sz, font: f, color: rgb(c[0], c[1], c[2]) }); };
+      cell(String(sol), hx + colW, colW);
+      cell(d.producto?.unidad ?? '', hx + colW * 2, colW);
+      if (isRecibido) {
+        if (hasDiff) cell(rec + ' (▲ ' + (rec - sol) + ')', hx + colW * 3, colW, rec - sol > 0 ? [0.18, 0.49, 0.20] : [0.78, 0.16, 0.16], bold);
+        else cell(rec != null ? String(rec) : '-', hx + colW * 3, colW);
+      }
+      drawText(d.comentario ?? '', hx + colW * (isRecibido ? 4 : 3), 9, font, [0.55, 0.55, 0.55], colW - 4);
+      top += 16;
+    }
+    top += 12;
+  }
+
+  // Incidencias
+  const exd = pedido.extrasAlbaran;
+  if (exd) {
+    const extras = exd?.extras ?? [], noReg = exd?.noRegistrados ?? [], noLle = exd?.noLlegaron ?? [];
+    if (extras.length || noReg.length || noLle.length) {
+      ensureSpace(60);
+      top += 6;
+      page.drawRectangle({ x: M, y: PH - top, width: PW - 2 * M, height: 20, color: rgb(0.996, 0.95, 0.78) });
+      drawText('Incidencias del albarán', M + 6, 11, bold, [0.57, 0.25, 0.05]); top += 28;
+      if (noLle.length) { drawText('Productos del pedido no llegaron:', M, 10, bold, [0.86, 0.15, 0.15]); top += 14; for (const n of noLle) { drawText('• ' + n.nombre + ' — pedido ' + n.cantidadSolicitada + ' → recibido 0', M + 6, 10, font, [0.6, 0.10, 0.10]); top += 13; } top += 6; }
+      if (extras.length) { drawText('Llegaron sin pedirlos:', M, 10, bold, [0.57, 0.25, 0.05]); top += 14; for (const e of extras) { drawText('• ' + e.nombre + ' — ' + e.cantidad + ' ' + e.unidad, M + 6, 10, font, [0.57, 0.25, 0.05]); top += 13; } top += 6; }
+      if (noReg.length) { drawText('No dados de alta:', M, 10, bold, [0.86, 0.15, 0.15]); top += 14; for (const n of noReg) { drawText('• ' + n.nombre + ' — ' + n.cantidad, M + 6, 10, font, [0.6, 0.10, 0.10]); top += 13; } }
+    }
+  }
+
+  // Pie
+  drawText('Total: ' + (pedido.detalles?.length ?? 0) + ' productos · Generado el ' + new Date().toLocaleDateString('es-ES') + ' · Pedidos Fruta y Verdura', M, 9, oblique, [0.60, 0.60, 0.60]);
+
+  const bytes = await doc.save();
+  return bytes;
+}
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const auth = await optionalAuth();
-
+  void auth;
   const id = parseIntId(params?.id);
   if (id === null) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
-
   try {
     const pedido = await prisma.pedido.findUnique({
       where: { id },
-      include: {
-        user: { select: { name: true, email: true } },
-        detalles: {
-          include: { producto: true },
-          orderBy: { producto: { nombre: 'asc' } },
-        },
-      },
+      include: { user: { select: { name: true, email: true } }, detalles: { include: { producto: true }, orderBy: { producto: { nombre: 'asc' } } } },
     });
-
     if (!pedido) return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 });
-
-    const tipoLabel = TIPO_PEDIDO_LABELS;
-
-    // Group by category
-    const byCategory: Record<string, any[]> = {};
-    for (const d of (pedido.detalles ?? [])) {
-      const cat = d.producto?.categoria ?? 'Otros';
-      if (!byCategory[cat]) byCategory[cat] = [];
-      byCategory[cat].push(d);
-    }
-
-    const catColors: Record<string, string> = {
-      Verduras: '#4CAF50',
-      Frutas: '#FF9800',
-      Ensaladas: '#2196F3',
-    };
-
-    const categorySections = Object.entries(byCategory).map(([cat, items]) => {
-      const color = catColors[cat] ?? '#666';
-      const rows = items.map((d: any) => {
-        const sol = d.cantidadSolicitada ?? 0;
-        const rec = d.cantidadRecibida;
-        const hasDiff = rec !== null && rec !== undefined && rec !== sol;
-        let diffLabel = '';
-        let diffColor = '';
-        if (hasDiff) {
-          const delta = rec - sol;
-          if (delta > 0) {
-            diffLabel = ` <span style="font-size:11px;color:#2e7d32;font-weight:600;">(▲ +${delta})</span>`;
-            diffColor = 'color:#2e7d32;font-weight:600;';
-          } else {
-            diffLabel = ` <span style="font-size:11px;color:#c62828;font-weight:600;">(▼ ${delta})</span>`;
-            diffColor = 'color:#c62828;font-weight:600;';
-          }
-        }
-        return `
-        <tr>
-          <td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:13px;">${d.producto?.nombre ?? 'Producto'}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:13px;text-align:center;font-weight:600;">${sol}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:13px;text-align:center;">${d.producto?.unidad ?? ''}</td>
-          ${pedido.estado === 'recibido' ? `<td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:13px;text-align:center;${diffColor}">${rec ?? '-'}${diffLabel}</td>` : ''}
-          <td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:12px;color:#666;">${d.comentario ?? ''}</td>
-        </tr>
-      `;
-      }).join('');
-
-      return `
-        <div style="margin-bottom:20px;">
-          <h3 style="color:${color};font-size:15px;margin:0 0 8px 0;padding:6px 12px;background:${color}11;border-left:3px solid ${color};border-radius:0 4px 4px 0;">${cat} (${items.length})</h3>
-          <table style="width:100%;border-collapse:collapse;">
-            <thead>
-              <tr style="background:#f8f9fa;">
-                <th style="padding:8px 12px;text-align:left;font-size:12px;color:#666;font-weight:600;">Producto</th>
-                <th style="padding:8px 12px;text-align:center;font-size:12px;color:#666;font-weight:600;">Cantidad</th>
-                <th style="padding:8px 12px;text-align:center;font-size:12px;color:#666;font-weight:600;">Unidad</th>
-                ${pedido.estado === 'recibido' ? '<th style="padding:8px 12px;text-align:center;font-size:12px;color:#666;font-weight:600;">Recibido</th>' : ''}
-                <th style="padding:8px 12px;text-align:left;font-size:12px;color:#666;font-weight:600;">Notas</th>
-              </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-      `;
-    }).join('');
-
-    const estadoLabel: Record<string, string> = { borrador: 'Borrador', enviado: 'Enviado', recibido: 'Recibido' };
-    const estadoColor: Record<string, string> = { borrador: '#f59e0b', enviado: '#3b82f6', recibido: '#22c55e' };
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head><meta charset="UTF-8"></head>
-      <body style="font-family:'Helvetica Neue',Arial,sans-serif;color:#333;margin:0;padding:30px;">
-        <div style="max-width:800px;margin:0 auto;">
-          <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #4CAF50;padding-bottom:15px;margin-bottom:25px;">
-            <div>
-              <h1 style="margin:0;font-size:22px;color:#2e7d32;">Pedido de Fruta y Verdura</h1>
-              <p style="margin:4px 0 0;font-size:13px;color:#666;">Pedido #${pedido.id}</p>
-            </div>
-            <div style="text-align:right;">
-              <span style="display:inline-block;padding:4px 12px;border-radius:12px;font-size:12px;font-weight:600;color:white;background:${estadoColor[pedido.estado] ?? '#666'};">${estadoLabel[pedido.estado] ?? pedido.estado}</span>
-            </div>
-          </div>
-
-          <div style="display:flex;gap:20px;margin-bottom:25px;flex-wrap:wrap;">
-            <div style="flex:1;min-width:150px;padding:10px 15px;background:#f8f9fa;border-radius:8px;">
-              <p style="margin:0;font-size:11px;color:#666;text-transform:uppercase;">Fecha pedido</p>
-              <p style="margin:3px 0 0;font-size:14px;font-weight:600;">${new Date(pedido.fechaPedido).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            </div>
-            ${pedido.fechaEntrega ? `
-            <div style="flex:1;min-width:150px;padding:10px 15px;background:#f8f9fa;border-radius:8px;">
-              <p style="margin:0;font-size:11px;color:#666;text-transform:uppercase;">Fecha entrega</p>
-              <p style="margin:3px 0 0;font-size:14px;font-weight:600;">${new Date(pedido.fechaEntrega).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            </div>
-            ` : ''}
-            ${pedido.tipoPedido ? `
-            <div style="flex:1;min-width:150px;padding:10px 15px;background:#f8f9fa;border-radius:8px;">
-              <p style="margin:0;font-size:11px;color:#666;text-transform:uppercase;">Tipo</p>
-              <p style="margin:3px 0 0;font-size:14px;font-weight:600;">${tipoLabel[pedido.tipoPedido] ?? pedido.tipoPedido}</p>
-            </div>
-            ` : ''}
-            <div style="flex:1;min-width:150px;padding:10px 15px;background:#f8f9fa;border-radius:8px;">
-              <p style="margin:0;font-size:11px;color:#666;text-transform:uppercase;">Creado por</p>
-              <p style="margin:3px 0 0;font-size:14px;font-weight:600;">${pedido.user?.name ?? 'Usuario'}</p>
-            </div>
-          </div>
-
-          ${pedido.notas ? `<div style="padding:10px 15px;background:#fff3e0;border-radius:8px;margin-bottom:25px;"><p style="margin:0;font-size:13px;"><strong>Notas:</strong> ${pedido.notas}</p></div>` : ''}
-
-          ${categorySections}
-
-          ${(() => {
-            const extData = pedido.extrasAlbaran as any;
-            if (!extData) return '';
-            const extras = extData?.extras ?? [];
-            const noReg = extData?.noRegistrados ?? [];
-            const noLlegaron = extData?.noLlegaron ?? [];
-            if (extras.length === 0 && noReg.length === 0 && noLlegaron.length === 0) return '';
-            let html = '<div style="margin-top:20px;border:2px solid #f59e0b;border-radius:8px;overflow:hidden;">';
-            html += '<div style="background:#fef3c7;padding:10px 15px;"><h3 style="margin:0;font-size:14px;color:#92400e;">⚠️ Incidencias del albarán</h3></div>';
-            if (noLlegaron.length > 0) {
-              html += '<div style="padding:10px 15px;">';
-              html += '<p style="margin:0 0 8px;font-size:11px;font-weight:600;color:#dc2626;text-transform:uppercase;">⚠ Productos del pedido no detectados en albaranes (no llegaron)</p>';
-              html += '<table style="width:100%;border-collapse:collapse;">';
-              html += '<thead><tr style="background:#fef2f2;"><th style="padding:6px 12px;text-align:left;font-size:11px;color:#991b1b;">Producto</th><th style="padding:6px 12px;text-align:center;font-size:11px;color:#991b1b;">Pedido</th><th style="padding:6px 12px;text-align:center;font-size:11px;color:#991b1b;">Recibido</th><th style="padding:6px 12px;text-align:center;font-size:11px;color:#991b1b;">Unidad</th><th style="padding:6px 12px;text-align:left;font-size:11px;color:#991b1b;">Categoría</th></tr></thead><tbody>';
-              for (const nl of noLlegaron) {
-                html += `<tr><td style="padding:6px 12px;border-bottom:1px solid #fecaca;font-size:13px;font-weight:600;color:#991b1b;">${nl.nombre}</td><td style="padding:6px 12px;border-bottom:1px solid #fecaca;font-size:13px;text-align:center;text-decoration:line-through;color:#999;">${nl.cantidadSolicitada}</td><td style="padding:6px 12px;border-bottom:1px solid #fecaca;font-size:13px;text-align:center;font-weight:700;color:#dc2626;">0</td><td style="padding:6px 12px;border-bottom:1px solid #fecaca;font-size:13px;text-align:center;">${nl.unidad ?? ''}</td><td style="padding:6px 12px;border-bottom:1px solid #fecaca;font-size:12px;color:#666;">${nl.categoria ?? ''}</td></tr>`;
-              }
-              html += '</tbody></table></div>';
-            }
-            if (extras.length > 0) {
-              html += '<div style="padding:10px 15px;border-top:1px solid #fde68a;">';
-              html += '<p style="margin:0 0 8px;font-size:11px;font-weight:600;color:#92400e;text-transform:uppercase;">Llegaron sin pedirlos (registrados en el sistema)</p>';
-              html += '<table style="width:100%;border-collapse:collapse;">';
-              html += '<thead><tr style="background:#fef9ee;"><th style="padding:6px 12px;text-align:left;font-size:11px;color:#92400e;">Producto</th><th style="padding:6px 12px;text-align:center;font-size:11px;color:#92400e;">Cantidad</th><th style="padding:6px 12px;text-align:center;font-size:11px;color:#92400e;">Unidad</th><th style="padding:6px 12px;text-align:left;font-size:11px;color:#92400e;">Categoría</th></tr></thead><tbody>';
-              for (const ex of extras) {
-                html += `<tr><td style="padding:6px 12px;border-bottom:1px solid #fde68a;font-size:13px;">${ex.nombre}</td><td style="padding:6px 12px;border-bottom:1px solid #fde68a;font-size:13px;text-align:center;font-weight:600;color:#92400e;">${ex.cantidad}</td><td style="padding:6px 12px;border-bottom:1px solid #fde68a;font-size:13px;text-align:center;">${ex.unidad ?? ''}</td><td style="padding:6px 12px;border-bottom:1px solid #fde68a;font-size:12px;color:#666;">${ex.categoria ?? ''}</td></tr>`;
-              }
-              html += '</tbody></table></div>';
-            }
-            if (noReg.length > 0) {
-              html += '<div style="padding:10px 15px;border-top:1px solid #fde68a;">';
-              html += '<p style="margin:0 0 8px;font-size:11px;font-weight:600;color:#dc2626;text-transform:uppercase;">Productos no dados de alta en el sistema</p>';
-              for (const nr of noReg) {
-                html += `<div style="display:flex;justify-content:space-between;padding:5px 12px;background:#fef2f2;border-radius:4px;margin-bottom:4px;"><span style="font-size:13px;color:#991b1b;">${nr.nombre}</span><span style="font-size:13px;font-weight:600;color:#dc2626;">${nr.cantidad}</span></div>`;
-              }
-              html += '</div>';
-            }
-            html += '</div>';
-            return html;
-          })()}
-
-          <div style="margin-top:25px;padding-top:15px;border-top:1px solid #eee;text-align:center;">
-            <p style="font-size:11px;color:#999;">Total: ${pedido.detalles?.length ?? 0} productos · Generado el ${new Date().toLocaleDateString('es-ES')}</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-
-    // Generate PDF via Abacus API
-    const createResponse = await fetch('https://apps.abacus.ai/api/createConvertHtmlToPdfRequest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        deployment_token: process.env.ABACUSAI_API_KEY,
-        html_content: html,
-        pdf_options: { format: 'A4', margin: { top: '15mm', right: '15mm', bottom: '15mm', left: '15mm' }, print_background: true },
-      }),
-    });
-
-    if (!createResponse.ok) {
-      return NextResponse.json({ error: 'Error generando PDF' }, { status: 500 });
-    }
-
-    const { request_id } = await createResponse.json();
-    if (!request_id) return NextResponse.json({ error: 'Error generando PDF' }, { status: 500 });
-
-    // Poll for status
-    let attempts = 0;
-    while (attempts < 60) {
-      await new Promise(r => setTimeout(r, 1000));
-      const statusRes = await fetch('https://apps.abacus.ai/api/getConvertHtmlToPdfStatus', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ request_id, deployment_token: process.env.ABACUSAI_API_KEY }),
-      });
-      const statusResult = await statusRes.json();
-      if (statusResult?.status === 'SUCCESS' && statusResult?.result?.result) {
-        const pdfBuffer = Buffer.from(statusResult.result.result, 'base64');
-        return new NextResponse(pdfBuffer, {
-          headers: {
-            'Content-Type': 'application/pdf',
-            'Content-Disposition': `attachment; filename="pedido-${pedido.id}.pdf"`,
-          },
-        });
-      } else if (statusResult?.status === 'FAILED') {
-        return NextResponse.json({ error: 'Fallo en la generación del PDF' }, { status: 500 });
-      }
-      attempts++;
-    }
-
-    return NextResponse.json({ error: 'Tiempo de espera agotado' }, { status: 500 });
+    const buffer = await buildPdf(pedido);
+    return new NextResponse(Buffer.from(buffer) as any, { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="pedido-' + id + '.pdf"' } });
   } catch (error: any) {
     console.error('PDF error:', error?.message);
-    return NextResponse.json({ error: error?.message ?? 'Error' }, { status: 500 });
+    return NextResponse.json({ error: error?.message ?? 'Error generando PDF' }, { status: 500 });
   }
 }
